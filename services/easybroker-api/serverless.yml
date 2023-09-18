@@ -1,0 +1,55 @@
+service: poc-easybroker
+
+custom:
+  bucket:
+    name: poc-serverless
+    project: poc-easybroker
+  logger:
+    level:
+      dev: DEBUG
+      prd: INFO
+
+plugins:
+  - serverless-esbuild
+  - serverless-offline
+  - serverless-cloudformation-sub-variables
+
+provider:
+  name: aws
+  region: ${opt:region, 'us-east-1'}
+  runtime: nodejs16.x
+  memorySize: 128
+  stage: ${opt:stage, 'dev'}
+  endpointType: regional
+  deploymentBucket:
+    name: ${self:custom.bucket.name}
+    maxPreviousDeploymentArtifacts: 3
+    serverSideEncryption: AES256
+  deploymentPrefix: ${self:custom.bucket.project}
+  logRetentionInDays: 7
+  versionFunctions: false
+  environment:
+    ACCOUNT_ID: '#{AWS::AccountId}'
+    REGION: ${self:provider.region}
+    STAGE: ${self:provider.stage}
+    LOGGER_LEVEL: ${self:custom.logger.level.${self:provider.stage}}
+    AWS_NODEJS_CONNECTION_REUSE_ENABLED: 1
+    NODE_TLS_REJECT_UNAUTHORIZED: 0
+  apiGateway:
+    resourcePolicy:
+      - Effect: Allow
+        Principal: '*'
+        Action: execute-api:Invoke
+        Resource:
+          - execute-api:/*/*/*
+  tracing:
+    lambda: true
+    apiGateway: true
+
+functions:
+  getProperties:
+    handler: src/controller/getProperties.handler
+    events:
+      - http:
+          path: /properties
+          method: get
